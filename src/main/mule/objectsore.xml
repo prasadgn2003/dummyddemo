@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:os="http://www.mulesoft.org/schema/mule/os"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+
+	<os:object-store name="Object_store" doc:name="Object store" doc:id="de366e15-1154-43b2-aea5-54ea1c916c27" />
+
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="53735c17-a1aa-4c6a-9158-9755c2fc77f6">
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+
+	<flow name="objectsoreFlow" doc:id="707ae11b-205b-4dce-9caf-c841922aa2af">
+
+		<http:listener doc:name="Listener" doc:id="5b1a5f91-74c6-4f4b-8449-98a0dc7ea611" config-ref="HTTP_Listener_config" path="/token"/>
+
+		<os:retrieve doc:name="Retrieve cached token" doc:id="b5954c1a-114f-4f73-8f3e-402c4e3f2cef" key="tokenKey" objectStore="Object_store">
+			<os:default-value><![CDATA[#[{}]]]></os:default-value>
+		</os:retrieve>
+
+		<set-variable value="#[payload.expiryTime default 0]" doc:name="Set bearer expiry" doc:id="3e68d81d-0630-417c-8603-d6f4bcafb661" variableName="bearer"/>
+
+		<choice doc:name="Token valid?" doc:id="c1c08314-6f54-4b8a-85d3-4433b8ce5bc9">
+
+			<when expression='#[vars.bearer &gt; (now() as Number {unit: "milliseconds"})]'>
+				<logger level="INFO" doc:name="Log cache hit" doc:id="2b776c27-9cd4-4b50-99b1-1a4785de37e3" message="Token cache HIT - reusing cached token"/>
+				<set-payload value="#[payload.accessToken]" doc:name="Reuse cached token" doc:id="d61e4d4c-af46-48e7-8e7c-74583aca2c73"/>
+			</when>
+
+			<otherwise>
+				<logger level="INFO" doc:name="Log cache miss" doc:id="98902c00-fb56-407d-be4a-75442a5eb074" message="Token cache MISS - fetching new token from Auth0"/>
+
+				<http:request method="POST" doc:name="Fetch token from Auth0" doc:id="7a7d8148-d44e-4c5a-8e26-3669431e4942" url="https://dev-5bwce4ro4n46hsih.us.auth0.com/oauth/token">
+					<http:body><![CDATA[#[%dw 2.0
+output application/json
+---
+{
+    "client_id": "O1x6fAgE5tCMi1vDH4U3ZmhmVCpgCdXZ",
+    "client_secret": "buDktSGRu9EavNnBOUanq9o3O06apINGR67GDgzAUhrP5ylN8B2dyQtgfjKSjUXO",
+    "audience": "https://dev-5bwce4ro4n46hsih.us.auth0.com/api/v2/",
+    "grant_type": "client_credentials"
+}]]]></http:body>
+					<http:headers><![CDATA[#[output application/java
+---
+{
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+				</http:request>
+
+				<ee:transform doc:name="Build token + expiry" doc:id="c2fb1977-b1f8-42b5-97e9-9b2b2ccd7d06">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    accessToken: payload.access_token,
+    expiryTime: (now() as Number {unit: "milliseconds"}) + ((payload.expires_in default 0) * 1000)
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+
+				<set-variable value="#[payload]" doc:name="Save newToken var" doc:id="f8969bd1-b6e1-4029-9c09-d8dcb69a8a45" variableName="newToken"/>
+
+				<os:store doc:name="Cache token" doc:id="9fcf7904-7177-41d0-af3e-120c615fc2dc" key="tokenKey" objectStore="Object_store">
+					<os:value><![CDATA[#[vars.newToken]]]></os:value>
+				</os:store>
+
+				<set-payload value="#[vars.newToken.accessToken]" doc:name="Return new token" doc:id="88708027-e6ec-4175-9d15-3c75b52406ee"/>
+			</otherwise>
+		</choice>
+	</flow>
+</mule>
