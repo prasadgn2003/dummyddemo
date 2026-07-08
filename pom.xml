@@ -13,7 +13,7 @@
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
-		<app.runtime>4.12.0:10e</app.runtime>
+		<app.runtime>4.8.1</app.runtime>
 		<mule.maven.plugin.version>4.3.0</mule.maven.plugin.version>
 	</properties>
 
@@ -35,7 +35,7 @@
 						<provider>MC</provider>
 						<environment>Sandbox</environment>
 						<target>Cloudhub-US-East-2</target>
-						<muleVersion>4.8.1</muleVersion>
+						<muleVersion>4.12.1:4e</muleVersion>
 						<applicationName>objectstore-demo-prasadgn</applicationName>
 						<replicas>1</replicas>
 						<vCores>0.1</vCores>
